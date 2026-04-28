@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { hashPassword } from '../utils/crypto'
+import { hashPassword, decodeTokenPayload } from '../utils/crypto'
 import {
   Box,
   Button,
@@ -44,12 +44,16 @@ export default function SignUp() {
         body: JSON.stringify({ ...form, password: await hashPassword(form.password) }),
       })
 
+      const data = await res.json()
+
       if (res.status === 201) {
-        navigate('/login')
+        sessionStorage.setItem('token', data.token)
+        const payload = decodeTokenPayload(data.token)
+        sessionStorage.setItem('name', payload.name as string)
+        navigate('/')
         return
       }
 
-      const data = await res.json()
       setErrors(data)
     } catch {
       setErrors({ non_field_errors: ['Network error. Please try again.'] })

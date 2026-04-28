@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { hashPassword } from '../utils/crypto'
+import { hashPassword, decodeTokenPayload } from '../utils/crypto'
 import {
   Box,
   Button,
@@ -39,7 +39,9 @@ export default function Login() {
       const data = await res.json()
 
       if (res.ok) {
-        localStorage.setItem('token', data.token)
+        sessionStorage.setItem('token', data.token)
+        const payload = decodeTokenPayload(data.token)
+        sessionStorage.setItem('name', payload.name as string)
         navigate('/')
         return
       }

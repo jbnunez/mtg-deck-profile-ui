@@ -1,3 +1,8 @@
+export function decodeTokenPayload(token: string): Record<string, unknown> {
+  const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')
+  return JSON.parse(atob(base64))
+}
+
 export async function hashPassword(password: string): Promise<string> {
   const data = new TextEncoder().encode(password)
   const hashBuffer = await crypto.subtle.digest('SHA-256', data)

@@ -12,6 +12,8 @@ export default function Header() {
 
   if (!token) return null
 
+  const { is_admin } = decodeTokenPayload(token) as { is_admin: boolean }
+
   function handleLogout() {
     sessionStorage.clear()
     setAnchor(null)
@@ -32,6 +34,11 @@ export default function Header() {
             <MenuItem component={Link} to="/manage-profile" onClick={() => setAnchor(null)}>
               Manage Profile
             </MenuItem>
+            {is_admin && (
+              <MenuItem component={Link} to="/admin" onClick={() => setAnchor(null)}>
+                Admin
+              </MenuItem>
+            )}
             <MenuItem onClick={handleLogout}>Log Out</MenuItem>
           </Menu>
         </Box>

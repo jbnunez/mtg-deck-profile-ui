@@ -50,10 +50,10 @@ function deriveMatchResult(g1: string, g2: string, g3: string): string {
     result += g1
   }
   if (g2.length > 0) {
-    result += g1
+    result += g2
   }
   if (g3.length > 0) {
-    result += g1
+    result += g3
   }
   if (result.length === 0) {
     return 'D'

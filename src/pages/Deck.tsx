@@ -6,6 +6,13 @@ import {
   CircularProgress,
   Divider,
   Link,
+  Tab,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow,
+  Tabs,
   TextField,
   Typography,
 } from '@mui/material'
@@ -19,6 +26,16 @@ import manaG from '../assets/mana-G.svg'
 import manaC from '../assets/mana-C.svg'
 
 const MANA_ICONS: Record<string, string> = { W: manaW, U: manaU, B: manaB, R: manaR, G: manaG, C: manaC }
+
+const WHITE_FIELD_SX = {
+  '& .MuiInputLabel-root': { color: 'white' },
+  '& .MuiInputLabel-root.Mui-focused': { color: 'white' },
+  '& .MuiInputBase-input': { color: 'white' },
+  '& .MuiOutlinedInput-notchedOutline': { borderColor: 'white' },
+  '& .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'white' },
+  '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: 'white' },
+  '& .MuiFormHelperText-root': { color: 'rgba(255,255,255,0.6)' },
+}
 
 interface Archetype {
   id: number
@@ -36,6 +53,22 @@ interface UserDeck {
   decklist_link: string | null
   num_matches: number
   last_played: string
+}
+
+interface OpponentRow {
+  opp_archetype_id: number
+  opp_archetype_name: string
+  opp_archetype_colors: string
+  total_matches: number
+  wins: number
+  win_rate: number
+}
+
+interface AggregateResults {
+  total_matches: number
+  total_wins: number
+  win_rate: number
+  by_opponent: OpponentRow[]
 }
 
 function formatLastPlayed(iso: string) {
@@ -56,6 +89,12 @@ export default function Deck() {
   const [deck, setDeck] = useState<UserDeck | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  const [tab, setTab] = useState(0)
+
+  const [results, setResults] = useState<AggregateResults | null>(null)
+  const [resultsLoading, setResultsLoading] = useState(false)
+  const [resultsError, setResultsError] = useState('')
 
   const [editing, setEditing] = useState(false)
   const [editName, setEditName] = useState('')
@@ -81,12 +120,30 @@ export default function Deck() {
       .finally(() => setLoading(false))
   }, [deckId, token])
 
+  useEffect(() => {
+    if (tab !== 1 || !deckId) return
+    setResultsLoading(true)
+    setResultsError('')
+    fetch(
+      `${import.meta.env.VITE_MTG_DECK_PROFILE_API}/v1/user-decks/aggregate-results/?deck_id=${deckId}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    )
+      .then(res => {
+        if (!res.ok) throw new Error('Failed to load results.')
+        return res.json() as Promise<AggregateResults>
+      })
+      .then(setResults)
+      .catch(err => setResultsError(err.message))
+      .finally(() => setResultsLoading(false))
+  }, [tab, deckId, token])
+
   function startEditing() {
     if (!deck) return
     setEditName(deck.name ?? '')
     setEditDecklist(deck.decklist ?? '')
     setEditDecklistLink(deck.decklist_link ?? '')
     setSaveError('')
+    setTab(0)
     setEditing(true)
   }
 
@@ -163,73 +220,153 @@ export default function Deck() {
             )}
           </Box>
 
-          <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+          <Typography variant="body1" color="text.secondary" sx={{ mb: 2 }}>
             {deck.archetype.format} · {deck.num_matches} match{deck.num_matches !== 1 ? 'es' : ''} · Last played {formatLastPlayed(deck.last_played)}
           </Typography>
 
+          <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 0, '& .MuiTab-root': { color: 'white' }, '& .MuiTab-root.Mui-selected': { color: 'primary.main' } }}>
+            <Tab label="Decklist" />
+            <Tab label="Results" />
+          </Tabs>
           <Divider sx={{ mb: 3 }} />
 
-          {editing ? (
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <TextField
-                label="Name (optional)"
-                value={editName}
-                onChange={e => setEditName(e.target.value)}
-                slotProps={{ htmlInput: { maxLength: 255 } }}
-              />
-              <TextField
-                label="Decklist"
-                multiline
-                rows={8}
-                value={editDecklist}
-                onChange={e => setEditDecklist(e.target.value)}
-                disabled={editDecklistLink.trim() !== ''}
-                helperText={editDecklistLink.trim() ? 'Clear the decklist link to enter a decklist' : ''}
-              />
-              <TextField
-                label="Decklist Link"
-                value={editDecklistLink}
-                onChange={e => setEditDecklistLink(e.target.value)}
-                disabled={editDecklist.trim() !== ''}
-                helperText={editDecklist.trim() ? 'Clear the decklist to enter a link instead' : ''}
-              />
-              {saveError && <Typography color="error" variant="body2">{saveError}</Typography>}
-              <Box sx={{ display: 'flex', gap: 1 }}>
-                <Button variant="contained" onClick={handleSave} disabled={saving}>
-                  {saving ? <CircularProgress size={20} /> : 'Save'}
-                </Button>
-                <Button onClick={cancelEditing} disabled={saving}>Cancel</Button>
+          {tab === 0 && (
+            editing ? (
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <TextField
+                  label="Name (optional)"
+                  value={editName}
+                  onChange={e => setEditName(e.target.value)}
+                  slotProps={{ htmlInput: { maxLength: 255 } }}
+                  sx={WHITE_FIELD_SX}
+                />
+                <TextField
+                  label="Decklist"
+                  multiline
+                  rows={8}
+                  value={editDecklist}
+                  onChange={e => setEditDecklist(e.target.value)}
+                  disabled={editDecklistLink.trim() !== ''}
+                  helperText={editDecklistLink.trim() ? 'Clear the decklist link to enter a decklist' : ''}
+                  sx={WHITE_FIELD_SX}
+                />
+                <TextField
+                  label="Decklist Link"
+                  value={editDecklistLink}
+                  onChange={e => setEditDecklistLink(e.target.value)}
+                  disabled={editDecklist.trim() !== ''}
+                  helperText={editDecklist.trim() ? 'Clear the decklist to enter a link instead' : ''}
+                  sx={WHITE_FIELD_SX}
+                />
+                {saveError && <Typography color="error" variant="body2">{saveError}</Typography>}
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                  <Button variant="contained" onClick={handleSave} disabled={saving}>
+                    {saving ? <CircularProgress size={20} /> : 'Save'}
+                  </Button>
+                  <Button onClick={cancelEditing} disabled={saving}>Cancel</Button>
+                </Box>
               </Box>
-            </Box>
-          ) : (
-            <>
-              {deck.decklist_link && (
-                <Box sx={{ mb: 3 }}>
-                  <Typography variant="subtitle2" gutterBottom>Decklist Link</Typography>
-                  <Link href={deck.decklist_link} target="_blank" rel="noopener noreferrer">
-                    {deck.decklist_link}
-                  </Link>
-                </Box>
-              )}
-              {deck.decklist && (
-                <Box>
-                  <Typography variant="subtitle2" gutterBottom>Decklist</Typography>
-                  <Box
-                    component="pre"
-                    sx={{
-                      fontFamily: 'monospace',
-                      fontSize: 14,
-                      whiteSpace: 'pre-wrap',
-                      wordBreak: 'break-word',
-                      bgcolor: 'action.hover',
-                      borderRadius: 1,
-                      p: 2,
-                      m: 0,
-                    }}
-                  >
-                    {deck.decklist}
+            ) : (
+              <>
+                {deck.decklist_link && (
+                  <Box sx={{ mb: 3 }}>
+                    <Typography variant="subtitle2" gutterBottom>Decklist Link</Typography>
+                    <Link href={deck.decklist_link} target="_blank" rel="noopener noreferrer">
+                      {deck.decklist_link}
+                    </Link>
                   </Box>
-                </Box>
+                )}
+                {deck.decklist && (
+                  <Box>
+                    <Typography variant="subtitle2" gutterBottom>Decklist</Typography>
+                    <Box
+                      component="pre"
+                      sx={{
+                        fontFamily: 'monospace',
+                        fontSize: 14,
+                        whiteSpace: 'pre-wrap',
+                        wordBreak: 'break-word',
+                        bgcolor: 'action.hover',
+                        borderRadius: 1,
+                        p: 2,
+                        m: 0,
+                      }}
+                    >
+                      {deck.decklist}
+                    </Box>
+                  </Box>
+                )}
+                {!deck.decklist && !deck.decklist_link && (
+                  <Typography color="text.secondary">No decklist added yet.</Typography>
+                )}
+              </>
+            )
+          )}
+
+          {tab === 1 && (
+            <>
+              {resultsLoading && <CircularProgress />}
+              {resultsError && <Typography color="error">{resultsError}</Typography>}
+              {results && (
+                <>
+                  <Box sx={{ display: 'flex', gap: 4, mb: 3 }}>
+                    <Box>
+                      <Typography variant="h5">{results.total_matches}</Typography>
+                      <Typography variant="body2" color="text.secondary">Matches</Typography>
+                    </Box>
+                    <Box>
+                      <Typography variant="h5">{results.total_wins}</Typography>
+                      <Typography variant="body2" color="text.secondary">Wins</Typography>
+                    </Box>
+                    <Box>
+                      <Typography variant="h5">{results.win_rate}%</Typography>
+                      <Typography variant="body2" color="text.secondary">Win Rate</Typography>
+                    </Box>
+                  </Box>
+
+                  {results.by_opponent.length > 0 ? (
+                    <Table
+                      size="small"
+                      sx={{
+                        '& .MuiTableCell-root': {
+                          color: 'white',
+                          borderColor: 'primary.main',
+                        },
+                      }}
+                    >
+                      <TableHead>
+                        <TableRow>
+                          <TableCell>Opponent</TableCell>
+                          <TableCell align="right">Matches</TableCell>
+                          <TableCell align="right">Wins</TableCell>
+                          <TableCell align="right">Win Rate</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {results.by_opponent
+                          .slice()
+                          .sort((a, b) => b.total_matches - a.total_matches)
+                          .map(row => (
+                            <TableRow key={row.opp_archetype_id}>
+                              <TableCell>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                  {row.opp_archetype_colors.split('').map((c, i) =>
+                                    MANA_ICONS[c] ? <img key={i} src={MANA_ICONS[c]} alt={c} width={16} height={16} /> : null
+                                  )}
+                                  {row.opp_archetype_name}
+                                </Box>
+                              </TableCell>
+                              <TableCell align="right">{row.total_matches}</TableCell>
+                              <TableCell align="right">{row.wins}</TableCell>
+                              <TableCell align="right">{row.win_rate}%</TableCell>
+                            </TableRow>
+                          ))}
+                      </TableBody>
+                    </Table>
+                  ) : (
+                    <Typography color="text.secondary">No results recorded yet.</Typography>
+                  )}
+                </>
               )}
             </>
           )}
@@ -237,7 +374,10 @@ export default function Deck() {
           <AddResultModal
             open={resultModalOpen}
             onClose={() => setResultModalOpen(false)}
-            onSuccess={() => setDeck(prev => prev ? { ...prev, num_matches: prev.num_matches + 1 } : prev)}
+            onSuccess={() => {
+              setDeck(prev => prev ? { ...prev, num_matches: prev.num_matches + 1 } : prev)
+              setResults(null)
+            }}
             deck={deck}
             token={token}
             currentUserId={currentUserId}
